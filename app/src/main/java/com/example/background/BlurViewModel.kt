@@ -20,12 +20,10 @@ import android.app.Application
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import androidx.lifecycle.LiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.work.Data
-import androidx.work.OneTimeWorkRequest
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
+import androidx.work.*
 import com.example.background.workers.BlurWorker
 import com.example.background.workers.CleanupWorker
 import com.example.background.workers.SaveImageToFileWorker
@@ -37,40 +35,45 @@ class BlurViewModel(application: Application) : ViewModel() {
 
     private var imageUri: Uri? = null
     private var outputUri: Uri? = null
+    lateinit var outputWorkInfos: LiveData<List<WorkInfo>>
 
     init {
         imageUri = getImageUri(application.applicationContext)
+        outputWorkInfos = workManager.getWorkInfosByTagLiveData(TAG_OUTPUT)
     }
+
     /**
      * Create the WorkRequest to apply the blur and save the resulting image
      * @param blurLevel The amount to blur the image
      */
     internal fun applyBlur(blurLevel: Int) {
-        //workManager.enqueue(OneTimeWorkRequest.from(BlurWorker::class.java))
-
-        // add WorkRequest to cleanup temporary images
-        var continuation = workManager.beginWith(OneTimeWorkRequest.from(CleanupWorker::class.java))
+        // tampilan aplikasi yang memburamkan satu gambar dalam satu waktu?
+        var continuation = workManager.beginUniqueWork(
+            IMAGE_MANIPULATION_WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            OneTimeWorkRequest.from(CleanupWorker::class.java)
+        )
 
         // WorkRequest untuk memburamkan beberapa kali sesuai permintaan
-        for (i in 0 until blurLevel){
+        for (i in 0 until blurLevel) {
             val blurBuilder = OneTimeWorkRequestBuilder<BlurWorker>()
 
             // Input Uri jika proses blur pertama
             // proses blur berikutnya menggunakan output dari hasil sebelumnya
-            if (i == 0){
+            if (i == 0) {
                 blurBuilder.setInputData(createInputDataForUri())
             }
             continuation = continuation.then(blurBuilder.build())
         }
 
-        val save = OneTimeWorkRequestBuilder<SaveImageToFileWorker>().build()
+        val save = OneTimeWorkRequestBuilder<SaveImageToFileWorker>().addTag(TAG_OUTPUT).build()
 
         continuation = continuation.then(save)
 
         continuation.enqueue()
     }
 
-    private fun createInputDataForUri(): Data{
+    private fun createInputDataForUri(): Data {
         val builder = Data.Builder()
         imageUri?.let {
             builder.putString(KEY_IMAGE_URI, imageUri.toString())
