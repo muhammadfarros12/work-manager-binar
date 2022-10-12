@@ -16,6 +16,7 @@
 
 package com.example.background
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import androidx.activity.viewModels
@@ -41,11 +42,21 @@ class BlurActivity : AppCompatActivity() {
         viewModel.outputWorkInfos.observe(this, workInfosObserver())
 
         binding.goButton.setOnClickListener { viewModel.applyBlur(blurLevel) }
+
+        binding.seeFileButton.setOnClickListener {
+            viewModel.outputUri?.let {
+                val actionView = Intent(Intent.ACTION_VIEW, it)
+                actionView.resolveActivity(packageManager)?.run {
+                    startActivity(actionView)
+                }
+            }
+        }
+
     }
 
-    private fun workInfosObserver(): Observer<List<WorkInfo>>{
+    private fun workInfosObserver(): Observer<List<WorkInfo>> {
         return Observer { listOfWorkInfo ->
-            if (listOfWorkInfo.isNullOrEmpty()){
+            if (listOfWorkInfo.isNullOrEmpty()) {
                 return@Observer
             }
 
@@ -53,8 +64,15 @@ class BlurActivity : AppCompatActivity() {
             // setiap continuation hanya mempunyai
             // satu worker dengan TAG_OUTPUT
             val workInfo = listOfWorkInfo[0]
-            if (workInfo.state.isFinished){
+            if (workInfo.state.isFinished) {
                 showWorkFinished()
+                // Normalnya proses ini diletakkan di viewmodel, agar lebih mudah sementara disini terlebih dahulu
+                val outputImageUri = workInfo.outputData.getString(KEY_IMAGE_URI)
+
+                if (!outputImageUri.isNullOrEmpty()) {
+                    viewModel.setOutputUri(outputImageUri)
+                    binding.seeFileButton.visibility = View.VISIBLE
+                }
             } else {
                 showWorkInProgress()
             }
