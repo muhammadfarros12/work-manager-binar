@@ -54,6 +54,10 @@ class BlurViewModel(application: Application) : ViewModel() {
             OneTimeWorkRequest.from(CleanupWorker::class.java)
         )
 
+        val constrains = Constraints.Builder()
+            .setRequiresCharging(true)
+            .build()
+
         // WorkRequest untuk memburamkan beberapa kali sesuai permintaan
         for (i in 0 until blurLevel) {
             val blurBuilder = OneTimeWorkRequestBuilder<BlurWorker>()
@@ -66,7 +70,10 @@ class BlurViewModel(application: Application) : ViewModel() {
             continuation = continuation.then(blurBuilder.build())
         }
 
-        val save = OneTimeWorkRequestBuilder<SaveImageToFileWorker>().addTag(TAG_OUTPUT).build()
+        val save = OneTimeWorkRequestBuilder<SaveImageToFileWorker>()
+            .setConstraints(constrains)
+            .addTag(TAG_OUTPUT)
+            .build()
 
         continuation = continuation.then(save)
 
