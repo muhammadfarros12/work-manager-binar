@@ -50,13 +50,20 @@ class BlurViewModel(application: Application) : ViewModel() {
 
         // add WorkRequest to cleanup temporary images
         var continuation = workManager.beginWith(OneTimeWorkRequest.from(CleanupWorker::class.java))
-        // add WorkRequest to blur the image
-        val blurRequest = OneTimeWorkRequest.Builder(BlurWorker::class.java).setInputData(createInputDataForUri()).build()
 
-        continuation = continuation.then(blurRequest)
+        // WorkRequest untuk memburamkan beberapa kali sesuai permintaan
+        for (i in 0 until blurLevel){
+            val blurBuilder = OneTimeWorkRequestBuilder<BlurWorker>()
 
-        // add WorkRequest to save the image to the filesystem
-        val save = OneTimeWorkRequest.Builder(SaveImageToFileWorker::class.java).build()
+            // Input Uri jika proses blur pertama
+            // proses blur berikutnya menggunakan output dari hasil sebelumnya
+            if (i == 0){
+                blurBuilder.setInputData(createInputDataForUri())
+            }
+            continuation = continuation.then(blurBuilder.build())
+        }
+
+        val save = OneTimeWorkRequestBuilder<SaveImageToFileWorker>().build()
 
         continuation = continuation.then(save)
 
